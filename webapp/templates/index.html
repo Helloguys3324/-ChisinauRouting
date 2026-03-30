@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chisinau Transport</title>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, sans-serif; background: #1a1a2e; overflow: hidden; }
+        #map { position: fixed; top: 0; left: 0; width: 100%; height: 100%; }
+        
+        .header {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+            background: linear-gradient(180deg, rgba(26,26,46,0.9) 0%, transparent 100%);
+            padding: 6px 8px;
+        }
+        .header-content { display: flex; align-items: center; justify-content: space-between; }
+        .title { color: #fff; font-size: 13px; font-weight: 600; }
+        .live-badge { background: #e94560; color: #fff; padding: 2px 6px; border-radius: 8px; font-size: 8px; }
+        
+        .controls {
+            position: fixed; right: 5px; top: 50%; transform: translateY(-50%); z-index: 1000;
+            display: flex; flex-direction: column; gap: 3px;
+        }
+        .ctrl-btn {
+            width: 28px; height: 28px; border-radius: 6px; border: none;
+            background: rgba(26,26,46,0.9); color: #fff; font-size: 12px; cursor: pointer;
+        }
+        .ctrl-btn.active { background: #667eea; }
+        
+        .routing-panel {
+            position: fixed; top: 32px; left: 5px; right: 5px; z-index: 1001;
+            background: rgba(26,26,46,0.95); border-radius: 8px; padding: 6px;
+            display: none;
+        }
+        .routing-panel.active { display: block; }
+        
+        .transport-modes { display: flex; gap: 2px; margin-bottom: 5px; background: rgba(0,0,0,0.2); border-radius: 5px; padding: 2px; }
+        .mode-btn {
+            flex: 1; background: transparent; border: none; color: rgba(255,255,255,0.5);
+            padding: 3px; border-radius: 4px; font-size: 11px; cursor: pointer;
+        }
+        .mode-btn.active { background: #667eea; color: #fff; }
+        
+        .routing-inputs { display: flex; flex-direction: column; gap: 3px; }
+        .input-row {
+            display: flex; align-items: center; gap: 4px;
+            background: rgba(255,255,255,0.08); border-radius: 5px; padding: 4px 6px;
+        }
+        .input-icon { font-size: 8px; }
+        .route-input {
+            flex: 1; background: transparent; border: none; color: #fff;
+            font-size: 10px; outline: none; min-width: 0;
+        }
+        .route-input::placeholder { color: rgba(255,255,255,0.4); }
+        .use-loc-btn {
+            background: rgba(66,133,244,0.3); border: none; color: #4285f4;
+            padding: 2px 4px; border-radius: 3px; font-size: 8px; cursor: pointer;
+        }
+        
+        .search-results { max-height: 80px; overflow-y: auto; font-size: 9px; }
+        .search-item {
+            padding: 4px; background: rgba(255,255,255,0.05); border-radius: 3px;
+            margin-top: 2px; cursor: pointer; color: rgba(255,255,255,0.8);
+        }
+        
+        .routing-actions { display: flex; gap: 3px; margin-top: 5px; }
+        .route-btn {
+            flex: 1; background: rgba(255,255,255,0.1); border: none; color: #fff;
+            padding: 5px; border-radius: 5px; font-size: 9px; cursor: pointer;
+        }
+        .route-btn.primary { background: #667eea; }
+        
+        .route-result { display: none; margin-top: 5px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .route-result.active { display: block; }
+        .route-stats { display: flex; gap: 8px; font-size: 10px; color: #fff; }
+        
+        .bottom-bar {
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;
+            background: rgba(26,26,46,0.9); padding: 4px;
+        }
+        .routes-row { display: flex; gap: 3px; overflow-x: auto; }
+        .mini-route {
+            flex-shrink: 0; width: 24px; height: 24px; border-radius: 5px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 9px; font-weight: 600; color: #fff; cursor: pointer; opacity: 0.6;
+        }
+        .mini-route.selected { opacity: 1; box-shadow: 0 0 6px currentColor; }
+        
+        .loc-info {
+            position: fixed; bottom: 38px; left: 5px; right: 5px; z-index: 1000;
+            background: rgba(26,26,46,0.95); border-radius: 6px; padding: 6px;
+            display: none; font-size: 10px; color: #fff;
+        }
+        .loc-info.active { display: block; }
+        .loc-header { display: flex; justify-content: space-between; margin-bottom: 3px; }
+        .loc-close { background: none; border: none; color: rgba(255,255,255,0.5); font-size: 12px; cursor: pointer; }
+        .loc-addr { color: rgba(255,255,255,0.8); font-size: 9px; }
+        .loc-actions { display: flex; gap: 3px; margin-top: 4px; }
+        .loc-btn {
+            flex: 1; background: rgba(255,255,255,0.1); border: none; color: #fff;
+            padding: 4px; border-radius: 4px; font-size: 8px; cursor: pointer;
+        }
+        .loc-btn.primary { background: #667eea; }
+        
+        .maplibregl-popup-content {
+            background: rgba(26,26,46,0.95) !important; color: #fff !important;
+            border-radius: 6px !important; padding: 6px !important; font-size: 10px; min-width: 100px;
+        }
+        .maplibregl-popup-tip { border-top-color: rgba(26,26,46,0.95) !important; }
+        ::-webkit-scrollbar { width: 0; height: 0; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div class="header">
+        <div class="header-content">
+            <div class="title">🚌 Chisinau</div>
+            <div class="live-badge">LIVE</div>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button class="ctrl-btn" id="locateBtn">📍</button>
+        <button class="ctrl-btn" id="routeBtn">🧭</button>
+        <button class="ctrl-btn" id="toggleView">3D</button>
+        <button class="ctrl-btn" id="zoomIn">+</button>
+        <button class="ctrl-btn" id="zoomOut">−</button>
+    </div>
+    
+    <div class="routing-panel" id="routingPanel">
+        <div class="transport-modes">
+            <button class="mode-btn active" data-mode="driving">🚗</button>
+            <button class="mode-btn" data-mode="transit">🚌</button>
+            <button class="mode-btn" data-mode="foot">🚶</button>
+            <button class="mode-btn" data-mode="cycling">🚴</button>
+        </div>
+        <div class="routing-inputs">
+            <div class="input-row">
+                <span class="input-icon">🟢</span>
+                <input type="text" class="route-input" id="startInput" placeholder="Start point">
+                <button class="use-loc-btn" id="useMyStart">📍</button>
+            </div>
+            <div id="startResults" class="search-results"></div>
+            <div class="input-row">
+                <span class="input-icon">🔴</span>
+                <input type="text" class="route-input" id="endInput" placeholder="Destination">
+                <button class="use-loc-btn" id="useMyEnd">📍</button>
+            </div>
+            <div id="endResults" class="search-results"></div>
+        </div>
+        <div class="routing-actions">
+            <button class="route-btn" id="swapBtn">⇅</button>
+            <button class="route-btn primary" id="findRoute">Route</button>
+            <button class="route-btn" id="clearRoute">✕</button>
+        </div>
+        <div class="route-result" id="routeResult">
+            <div class="route-stats">
+                <span>📏 <span id="distVal">0</span> km</span>
+                <span>⏱ <span id="timeVal">0</span> min</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="loc-info" id="locInfo">
+        <div class="loc-header">
+            <span>📍 Location</span>
+            <button class="loc-close" id="closeLoc">×</button>
+        </div>
+        <div class="loc-addr" id="locAddr">Loading...</div>
+        <div class="loc-actions">
+            <button class="loc-btn" id="setStart">🟢 Start</button>
+            <button class="loc-btn" id="setEnd">🔴 End</button>
+            <button class="loc-btn primary" id="routeHere">🧭 Go</button>
+        </div>
+    </div>
+    
+    <div class="bottom-bar">
+        <div class="routes-row" id="routesRow"></div>
+    </div>
+
+    <script>
+        const CHISINAU = [28.8322, 47.0245];
+        const ROUTES = {
+            1: {name: "Botanica-Center", color: "#e74c3c"},
+            2: {name: "Ciocana-Buiucani", color: "#3498db"},
+            3: {name: "Riscani-Botanica", color: "#2ecc71"},
+            5: {name: "Telecentru", color: "#9b59b6"},
+            8: {name: "Airport", color: "#f39c12"},
+            10: {name: "Sculeni", color: "#1abc9c"},
+            22: {name: "Buiucani", color: "#e91e63"},
+            24: {name: "Ciocana", color: "#00bcd4"}
+        };
+        
+        let map, markers = {}, userMarker = null, is3D = false;
+        let selectedRoutes = new Set();
+        let startPoint = null, endPoint = null, startMarker = null, endMarker = null;
+        let selectedLoc = null, tempMarker = null;
+        let transportMode = 'driving';
+        let searchTimeout = null;
+        
+        // Init map
+        map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+            center: CHISINAU, zoom: 12, pitch: 0, attributionControl: false
+        });
+        
+        // Render mini route buttons
+        function renderRoutes() {
+            const row = document.getElementById('routesRow');
+            row.innerHTML = '';
+            Object.entries(ROUTES).forEach(([id, r]) => {
+                const btn = document.createElement('div');
+                btn.className = 'mini-route' + (selectedRoutes.size === 0 || selectedRoutes.has(id) ? ' selected' : '');
+                btn.style.background = r.color;
+                btn.textContent = id;
+                btn.title = r.name;
+                btn.onclick = () => { 
+                    if (selectedRoutes.has(id)) selectedRoutes.delete(id);
+                    else selectedRoutes.add(id);
+                    renderRoutes();
+                    updateVisibility();
+                };
+                row.appendChild(btn);
+            });
+        }
+        
+        function updateVisibility() {
+            Object.entries(markers).forEach(([id, m]) => {
+                const show = selectedRoutes.size === 0 || selectedRoutes.has(String(m._route));
+                m.getElement().style.display = show ? 'block' : 'none';
+            });
+        }
+        
+        // Update trolleybuses
+        function updateTrolleybuses(data) {
+            data.forEach(bus => {
+                const route = String(bus.route);
+                const el = document.createElement('div');
+                el.style.cssText = `
+                    width:24px;height:24px;background:${bus.color || ROUTES[route]?.color || '#667eea'};
+                    border:2px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;
+                    font-size:9px;font-weight:700;color:#fff;cursor:pointer;
+                `;
+                el.textContent = route;
+                
+                if (markers[bus.id]) {
+                    markers[bus.id].setLngLat([bus.lng, bus.lat]);
+                } else {
+                    const marker = new maplibregl.Marker({element: el})
+                        .setLngLat([bus.lng, bus.lat])
+                        .setPopup(new maplibregl.Popup({offset: 15}).setHTML(
+                            `<b>Route ${route}</b><br>${ROUTES[route]?.name || ''}<br>Speed: ${Math.round(bus.speed||0)} km/h`
+                        ))
+                        .addTo(map);
+                    marker._route = route;
+                    markers[bus.id] = marker;
+                }
+            });
+            updateVisibility();
+        }
+        
+        // Controls
+        document.getElementById('locateBtn').onclick = () => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    pos => showUserLocation(pos.coords.latitude, pos.coords.longitude),
+                    () => showUserLocation(47.0245, 28.8322),
+                    {enableHighAccuracy: true, timeout: 10000}
+                );
+            }
+        };
+        
+        function showUserLocation(lat, lng) {
+            if (userMarker) userMarker.remove();
+            const el = document.createElement('div');
+            el.style.cssText = 'width:14px;height:14px;background:#4285f4;border:2px solid #fff;border-radius:50%;box-shadow:0 0 10px rgba(66,133,244,0.6);';
+            userMarker = new maplibregl.Marker({element: el}).setLngLat([lng, lat]).addTo(map);
+            map.flyTo({center: [lng, lat], zoom: 15});
+        }
+        
+        document.getElementById('toggleView').onclick = function() {
+            is3D = !is3D;
+            map.easeTo({pitch: is3D ? 50 : 0, duration: 500});
+            this.textContent = is3D ? '2D' : '3D';
+            this.classList.toggle('active', is3D);
+        };
+        
+        document.getElementById('zoomIn').onclick = () => map.zoomIn();
+        document.getElementById('zoomOut').onclick = () => map.zoomOut();
+        
+        // Routing panel
+        document.getElementById('routeBtn').onclick = function() {
+            const panel = document.getElementById('routingPanel');
+            const isActive = panel.classList.toggle('active');
+            this.classList.toggle('active', isActive);
+        };
+        
+        // Transport modes
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                transportMode = btn.dataset.mode;
+            };
+        });
+        
+        // Map click for location
+        map.on('click', (e) => {
+            if (document.getElementById('routingPanel').classList.contains('active')) {
+                if (!startPoint) setPoint('start', e.lngLat.lat, e.lngLat.lng);
+                else if (!endPoint) setPoint('end', e.lngLat.lat, e.lngLat.lng);
+            } else {
+                selectedLoc = {lat: e.lngLat.lat, lng: e.lngLat.lng};
+                showLocInfo(selectedLoc);
+            }
+        });
+        
+        function showLocInfo(loc) {
+            if (tempMarker) tempMarker.remove();
+            const el = document.createElement('div');
+            el.style.cssText = 'width:20px;height:20px;background:#667eea;border:2px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);';
+            tempMarker = new maplibregl.Marker({element: el}).setLngLat([loc.lng, loc.lat]).addTo(map);
+            
+            document.getElementById('locAddr').textContent = 'Loading...';
+            document.getElementById('locInfo').classList.add('active');
+            
+            fetch(`/api/geocode/reverse/${loc.lat}/${loc.lng}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        const a = data.address;
+                        document.getElementById('locAddr').textContent = 
+                            (a.street || 'Unknown') + (a.house_number ? ' ' + a.house_number : '') + 
+                            (a.district ? ', ' + a.district : '');
+                    }
+                });
+        }
+        
+        document.getElementById('closeLoc').onclick = () => {
+            document.getElementById('locInfo').classList.remove('active');
+            if (tempMarker) tempMarker.remove();
+        };
+        
+        document.getElementById('setStart').onclick = () => {
+            if (selectedLoc) {
+                setPoint('start', selectedLoc.lat, selectedLoc.lng);
+                document.getElementById('locInfo').classList.remove('active');
+                document.getElementById('routingPanel').classList.add('active');
+                document.getElementById('routeBtn').classList.add('active');
+            }
+        };
+        
+        document.getElementById('setEnd').onclick = () => {
+            if (selectedLoc) {
+                setPoint('end', selectedLoc.lat, selectedLoc.lng);
+                document.getElementById('locInfo').classList.remove('active');
+                document.getElementById('routingPanel').classList.add('active');
+                document.getElementById('routeBtn').classList.add('active');
+            }
+        };
+        
+        document.getElementById('routeHere').onclick = () => {
+            if (selectedLoc) {
+                setPoint('end', selectedLoc.lat, selectedLoc.lng);
+                document.getElementById('locInfo').classList.remove('active');
+                document.getElementById('routingPanel').classList.add('active');
+                document.getElementById('routeBtn').classList.add('active');
+                if (!startPoint && userMarker) {
+                    const ll = userMarker.getLngLat();
+                    setPoint('start', ll.lat, ll.lng);
+                }
+                if (startPoint && endPoint) buildRoute();
+            }
+        };
+        
+        function setPoint(type, lat, lng) {
+            const point = {lat, lng};
+            const input = document.getElementById(type === 'start' ? 'startInput' : 'endInput');
+            input.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+            
+            if (type === 'start') {
+                startPoint = point;
+                if (startMarker) startMarker.remove();
+                const el = document.createElement('div');
+                el.style.cssText = 'width:16px;height:16px;background:#2ecc71;border:2px solid #fff;border-radius:50%;';
+                startMarker = new maplibregl.Marker({element: el}).setLngLat([lng, lat]).addTo(map);
+            } else {
+                endPoint = point;
+                if (endMarker) endMarker.remove();
+                const el = document.createElement('div');
+                el.style.cssText = 'width:16px;height:16px;background:#e74c3c;border:2px solid #fff;border-radius:50%;';
+                endMarker = new maplibregl.Marker({element: el}).setLngLat([lng, lat]).addTo(map);
+            }
+            
+            fetch(`/api/geocode/reverse/${lat}/${lng}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.address.street) {
+                        input.value = data.address.street + (data.address.house_number ? ' ' + data.address.house_number : '');
+                    }
+                });
+        }
+        
+        // Use my location
+        document.getElementById('useMyStart').onclick = () => getMyLoc(p => setPoint('start', p.lat, p.lng));
+        document.getElementById('useMyEnd').onclick = () => getMyLoc(p => setPoint('end', p.lat, p.lng));
+        
+        function getMyLoc(cb) {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    pos => cb({lat: pos.coords.latitude, lng: pos.coords.longitude}),
+                    () => alert('Could not get location'),
+                    {enableHighAccuracy: true}
+                );
+            }
+        }
+        
+        // Search
+        document.getElementById('startInput').oninput = (e) => searchAddr(e.target.value, 'startResults', p => setPoint('start', p.lat, p.lng));
+        document.getElementById('endInput').oninput = (e) => searchAddr(e.target.value, 'endResults', p => setPoint('end', p.lat, p.lng));
+        
+        function searchAddr(q, containerId, onSelect) {
+            clearTimeout(searchTimeout);
+            if (q.length < 3) { document.getElementById(containerId).innerHTML = ''; return; }
+            searchTimeout = setTimeout(() => {
+                fetch(`/api/geocode/search?q=${encodeURIComponent(q)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        const c = document.getElementById(containerId);
+                        c.innerHTML = '';
+                        if (data.success && data.results) {
+                            data.results.slice(0, 4).forEach(r => {
+                                const item = document.createElement('div');
+                                item.className = 'search-item';
+                                item.textContent = r.name.substring(0, 50);
+                                item.onclick = () => { onSelect({lat: r.lat, lng: r.lng}); c.innerHTML = ''; };
+                                c.appendChild(item);
+                            });
+                        }
+                    });
+            }, 300);
+        }
+        
+        // Swap
+        document.getElementById('swapBtn').onclick = () => {
+            const t = startPoint; startPoint = endPoint; endPoint = t;
+            const ti = document.getElementById('startInput').value;
+            document.getElementById('startInput').value = document.getElementById('endInput').value;
+            document.getElementById('endInput').value = ti;
+            
+            if (startMarker) startMarker.remove();
+            if (endMarker) endMarker.remove();
+            if (startPoint) {
+                const el = document.createElement('div');
+                el.style.cssText = 'width:16px;height:16px;background:#2ecc71;border:2px solid #fff;border-radius:50%;';
+                startMarker = new maplibregl.Marker({element: el}).setLngLat([startPoint.lng, startPoint.lat]).addTo(map);
+            }
+            if (endPoint) {
+                const el = document.createElement('div');
+                el.style.cssText = 'width:16px;height:16px;background:#e74c3c;border:2px solid #fff;border-radius:50%;';
+                endMarker = new maplibregl.Marker({element: el}).setLngLat([endPoint.lng, endPoint.lat]).addTo(map);
+            }
+        };
+        
+        // Build route
+        document.getElementById('findRoute').onclick = buildRoute;
+        
+        function buildRoute() {
+            if (!startPoint || !endPoint) { alert('Select start and end points'); return; }
+            
+            const btn = document.getElementById('findRoute');
+            btn.disabled = true; btn.textContent = '...';
+            
+            // Use transport mode for OSRM profile
+            const profile = transportMode; // driving, foot, cycling, transit
+            
+            fetch(`/api/route/${startPoint.lat}/${startPoint.lng}/${endPoint.lat}/${endPoint.lng}?mode=${profile}`)
+                .then(r => r.json())
+                .then(data => {
+                    btn.disabled = false; btn.textContent = 'Route';
+                    if (data.success && data.route) {
+                        document.getElementById('routeResult').classList.add('active');
+                        document.getElementById('distVal').textContent = data.route.distance.toFixed(1);
+                        document.getElementById('timeVal').textContent = Math.round(data.route.duration);
+                        
+                        // Draw route
+                        if (map.getLayer('route-line')) map.removeLayer('route-line');
+                        if (map.getSource('route')) map.removeSource('route');
+                        
+                        map.addSource('route', {
+                            type: 'geojson',
+                            data: { type: 'Feature', geometry: { type: 'LineString', coordinates: data.route.path } }
+                        });
+                        map.addLayer({
+                            id: 'route-line', type: 'line', source: 'route',
+                            paint: { 'line-color': '#667eea', 'line-width': 5, 'line-opacity': 0.9 }
+                        });
+                        
+                        const bounds = data.route.path.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(data.route.path[0], data.route.path[0]));
+                        map.fitBounds(bounds, {padding: 60});
+                    }
+                });
+        }
+        
+        // Clear
+        document.getElementById('clearRoute').onclick = () => {
+            startPoint = endPoint = null;
+            document.getElementById('startInput').value = '';
+            document.getElementById('endInput').value = '';
+            document.getElementById('startResults').innerHTML = '';
+            document.getElementById('endResults').innerHTML = '';
+            document.getElementById('routeResult').classList.remove('active');
+            if (startMarker) startMarker.remove();
+            if (endMarker) endMarker.remove();
+            if (tempMarker) tempMarker.remove();
+            if (map.getLayer('route-line')) map.removeLayer('route-line');
+            if (map.getSource('route')) map.removeSource('route');
+        };
+        
+        // Socket.IO
+        const socket = io();
+        socket.on('trolleybus_update', data => { if (data.trolleybuses) updateTrolleybuses(data.trolleybuses); });
+        
+        // Init
+        renderRoutes();
+        fetch('/api/trolleybuses').then(r => r.json()).then(data => { if (data.data) updateTrolleybuses(data.data); });
+    </script>
+</body>
+</html>

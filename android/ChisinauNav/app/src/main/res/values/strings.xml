@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Chișinău Nav</string>
+    <string name="my_location">My Location</string>
+    <string name="clear">Clear</string>
+    <string name="start">Start</string>
+    <string name="route_found">Route found</string>
+    <string name="no_route_found">No route found</string>
+    <string name="loading">Loading…</string>
+    <string name="error_network">Network error. Please check your connection.</string>
+    <string name="tap_for_destination">Tap to set destination</string>
+    <string name="long_press_for_origin">Long press to set origin</string>
+</resources>

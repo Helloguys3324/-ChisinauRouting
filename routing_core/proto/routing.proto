@@ -1,0 +1,125 @@
+syntax = "proto3";
+
+package chisinau.routing;
+
+option cc_enable_arenas = true;
+
+// Geographic coordinate
+message Coordinate {
+    double latitude = 1;
+    double longitude = 2;
+}
+
+// Route request
+message RouteRequest {
+    Coordinate origin = 1;
+    Coordinate destination = 2;
+    
+    // Optional departure time (Unix timestamp)
+    // If not set, current time is used
+    int64 departure_time = 3;
+    
+    // Search parameters
+    uint32 max_nodes = 4;        // Maximum nodes to explore (default: 100000)
+    uint32 max_time_ms = 5;      // Maximum search time in ms (default: 5000)
+    double heuristic_weight = 6; // A* heuristic weight (default: 1.0)
+    
+    // Response options
+    bool include_geometry = 7;   // Include full route geometry
+    bool include_segments = 8;   // Include per-segment breakdown
+}
+
+// Route segment (one road)
+message RouteSegment {
+    int64 edge_id = 1;
+    string name = 2;
+    double length_m = 3;
+    double time_sec = 4;
+    repeated Coordinate geometry = 5;
+}
+
+// Complete route
+message Route {
+    bool found = 1;
+    double total_distance_m = 2;
+    double total_time_sec = 3;
+    repeated RouteSegment segments = 4;
+    repeated Coordinate geometry = 5;
+    
+    // Performance metrics
+    uint32 nodes_explored = 6;
+    double compute_time_ms = 7;
+}
+
+// Route response
+message RouteResponse {
+    Route route = 1;
+    string error_message = 2;
+}
+
+// Map match request (GPS -> road edge)
+message MapMatchRequest {
+    Coordinate point = 1;
+    double max_distance_m = 2;  // Maximum distance to consider (default: 50)
+}
+
+// Map match result
+message MapMatchResult {
+    bool matched = 1;
+    int64 edge_id = 2;
+    double distance_m = 3;
+    double fraction = 4;        // Position along edge (0-1)
+    Coordinate projected_point = 5;
+}
+
+// Traffic query request
+message TrafficRequest {
+    // Either specify edge IDs or a bounding box
+    repeated int64 edge_ids = 1;
+    
+    // Bounding box (optional)
+    Coordinate southwest = 2;
+    Coordinate northeast = 3;
+}
+
+// Traffic data for one edge
+message EdgeTraffic {
+    int64 edge_id = 1;
+    double current_speed_kmh = 2;
+    double free_flow_speed_kmh = 3;
+    double congestion_ratio = 4;  // current/free_flow (1.0 = free flow)
+    int64 last_updated = 5;       // Unix timestamp
+}
+
+// Traffic response
+message TrafficResponse {
+    repeated EdgeTraffic edges = 1;
+    string error_message = 2;
+}
+
+// Health check
+message HealthRequest {}
+
+message HealthResponse {
+    bool healthy = 1;
+    string status = 2;
+    int64 node_count = 3;
+    int64 edge_count = 4;
+    int64 profile_count = 5;
+    double uptime_seconds = 6;
+}
+
+// Routing service
+service RoutingService {
+    // Find optimal route between two points
+    rpc FindRoute(RouteRequest) returns (RouteResponse);
+    
+    // Map-match GPS coordinate to road edge
+    rpc MapMatch(MapMatchRequest) returns (MapMatchResult);
+    
+    // Get traffic data for edges
+    rpc GetTraffic(TrafficRequest) returns (TrafficResponse);
+    
+    // Health check
+    rpc Health(HealthRequest) returns (HealthResponse);
+}

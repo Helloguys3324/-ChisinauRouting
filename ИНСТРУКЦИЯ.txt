@@ -1,0 +1,98 @@
+╔══════════════════════════════════════════════════════════════════╗
+║                 🚀 БЫСТРЫЙ СТАРТ 🚀                              ║
+╚══════════════════════════════════════════════════════════════════╝
+
+📍 ДВОЙНОЙ КЛИК: D:\ChisinauRouting\START.bat
+
+Это запустит:
+  ✓ PostgreSQL базу данных
+  ✓ Воркер для троллейбусов (Roataway GTFS-RT)
+  ✓ Воркер для трафика (TomTom API)
+  ✓ Live Dashboard с обновлением каждые 5 сек
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 ЧТО УВИДИШЬ НА DASHBOARD:
+
+  🗺️  ROAD NETWORK
+      Nodes: 3,192    Edges: 7,810    Total: 1,289 km
+
+  🚋 TROLLEYBUS TELEMETRY
+      Позиции троллейбусов в реальном времени
+      (когда Roataway API онлайн)
+
+  🚗 TOMTOM TRAFFIC
+      6 мониторинговых точек:
+      • Piata Centrala
+      • Stefan cel Mare / Ismail
+      • Buiucani - Ciocana
+      • Botanica Center
+      • Riscani Terminal
+      • Airport Road Junction
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚙️ НАСТРОЙКИ:
+
+  TomTom API Key: НАСТРОЕН ✓
+  Файл: D:\ChisinauRouting\ingestion\.env
+  Polling: каждые 10 минут
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🛑 КАК ОСТАНОВИТЬ:
+
+  Нажми Ctrl+C или закрой окно
+  Система спросит: остановить PostgreSQL? (Y/N)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔧 РУЧНОЕ УПРАВЛЕНИЕ:
+
+  Запустить PostgreSQL:
+    D:\ChisinauRouting\routing.bat start
+
+  Остановить PostgreSQL:
+    D:\ChisinauRouting\routing.bat stop
+
+  Статус базы данных:
+    D:\ChisinauRouting\routing.bat status
+
+  Открыть SQL консоль:
+    D:\ChisinauRouting\routing.bat psql
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📂 СТРУКТУРА ПРОЕКТА:
+
+  D:\ChisinauRouting\
+    ├── START.bat              ← ГЛАВНЫЙ ФАЙЛ
+    ├── ingestion\
+    │   ├── .env               ← TomTom API ключ
+    │   ├── dashboard.py       ← Dashboard скрипт
+    │   ├── gtfsrt_worker.py   ← Троллейбус воркер
+    │   └── tomtom_worker.py   ← Трафик воркер
+    ├── routing_core\          ← C++ routing engine (A*)
+    ├── database\              ← SQL схемы
+    └── tools\cmake\           ← CMake для C++
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🌐 БАЗА ДАННЫХ:
+
+  Host:     localhost
+  Port:     5432
+  Database: chisinau_routing
+  User:     chisinau
+  Password: routing_engine_2024
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 ПРИМЕЧАНИЕ:
+
+  • Roataway API может быть недоступен (DNS проблемы)
+  • TomTom Flow API не покрывает Молдову полностью
+  • В таких случаях используются симулированные данные
+    на основе реального времени суток
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

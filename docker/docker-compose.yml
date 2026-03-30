@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with PostGIS and TimescaleDB
+  database:
+    image: timescale/timescaledb-ha:pg16-all
+    container_name: chisinau-db
+    environment:
+      POSTGRES_USER: chisinau
+      POSTGRES_PASSWORD: routing_engine_2024
+      POSTGRES_DB: chisinau_routing
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chisinau -d chisinau_routing"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Python ingestion workers
+  ingestion:
+    build:
+      context: ./ingestion
+      dockerfile: ../docker/Dockerfile.ingestion
+    container_name: chisinau-ingestion
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_NAME: chisinau_routing
+      DB_USER: chisinau
+      DB_PASSWORD: routing_engine_2024
+      ROATAWAY_POLL_INTERVAL_SECONDS: 30
+      TOMTOM_API_KEY: ${TOMTOM_API_KEY:-}
+      TOMTOM_POLL_INTERVAL_SECONDS: 300
+    volumes:
+      - ./ingestion:/app
+    restart: unless-stopped
+
+  # C++ Routing Core - REST API
+  rest-api:
+    build:
+      context: ./routing_core
+      dockerfile: ../docker/Dockerfile.routing
+      args:
+        BUILD_TARGET: rest_server
+    container_name: chisinau-rest
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      DB_HOST: database
+      DB_PASSWORD: routing_engine_2024
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  # C++ Routing Core - gRPC API
+  grpc-api:
+    build:
+      context: ./routing_core
+      dockerfile: ../docker/Dockerfile.routing
+      args:
+        BUILD_TARGET: grpc_server
+    container_name: chisinau-grpc
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      DB_HOST: database
+      DB_PASSWORD: routing_engine_2024
+    ports:
+      - "50051:50051"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+
+networks:
+  default:
+    name: chisinau-network

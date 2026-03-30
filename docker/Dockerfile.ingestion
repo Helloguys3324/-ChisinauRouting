@@ -1,0 +1,44 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Create startup script
+RUN echo '#!/bin/bash\n\
+echo "Starting Chișinău Routing Ingestion Workers"\n\
+echo "Waiting for database..."\n\
+sleep 10\n\
+\n\
+# Run OSM extraction first (one-time)\n\
+if [ ! -f /app/.osm_imported ]; then\n\
+    echo "Running initial OSM import..."\n\
+    python osm_extractor.py --clear && touch /app/.osm_imported\n\
+fi\n\
+\n\
+# Start workers in background\n\
+echo "Starting GTFS-RT worker..."\n\
+python gtfsrt_worker.py --daemon &\n\
+\n\
+echo "Starting TomTom worker..."\n\
+python tomtom_worker.py --mock &\n\
+\n\
+echo "Starting Traffic Engine (hourly)..."\n\
+while true; do\n\
+    python traffic_engine.py --hours 1\n\
+    sleep 3600\n\
+done\n\
+' > /app/start.sh && chmod +x /app/start.sh
+
+CMD ["/app/start.sh"]

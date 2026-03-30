@@ -1,0 +1,16 @@
+# Render.com deployment configuration
+# https://render.com/docs/deploy-flask
+
+services:
+  - type: web
+    name: chisinau-routing
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: pip install -r webapp/requirements.txt
+    startCommand: cd webapp && gunicorn --worker-class eventlet -w 1 app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: FLASK_ENV
+        value: production

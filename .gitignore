@@ -1,0 +1,73 @@
+# ===========================================
+# Chișinău Routing Engine - Git Ignore
+# ===========================================
+
+# Environment & Secrets
+.env
+.env.*
+*.env
+secrets/
+*.secret
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Docker
+docker-compose.override.yml
+
+# Node (if any)
+node_modules/
+
+# Temp
+tmp/
+temp/
+*.tmp
+
+# Compiled C++
+routing_core/build/
+*.exe
+*.dll
+*.obj
+*.o
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Local config
+local_settings.py
+config.local.py

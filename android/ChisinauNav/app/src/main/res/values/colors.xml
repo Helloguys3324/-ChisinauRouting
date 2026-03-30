@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary brand colors -->
+    <color name="primary">#1976D2</color>
+    <color name="primary_variant">#1565C0</color>
+    <color name="on_primary">#FFFFFF</color>
+    
+    <!-- Secondary colors -->
+    <color name="secondary">#FF5722</color>
+    <color name="secondary_variant">#E64A19</color>
+    <color name="on_secondary">#FFFFFF</color>
+    
+    <!-- Background colors -->
+    <color name="background">#FAFAFA</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="on_background">#212121</color>
+    <color name="on_surface">#212121</color>
+    
+    <!-- Text colors -->
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="text_hint">#BDBDBD</color>
+    
+    <!-- Route colors -->
+    <color name="route_line">#4285F4</color>
+    <color name="route_line_alt">#9E9E9E</color>
+    
+    <!-- Traffic congestion colors -->
+    <color name="traffic_free_flow">#00C853</color>
+    <color name="traffic_light">#FFEB3B</color>
+    <color name="traffic_moderate">#FF9800</color>
+    <color name="traffic_heavy">#FF5722</color>
+    <color name="traffic_severe">#D32F2F</color>
+    
+    <!-- Utility colors -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="transparent">#00000000</color>
+</resources>

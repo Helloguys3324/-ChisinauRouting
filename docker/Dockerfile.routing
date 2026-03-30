@@ -1,0 +1,54 @@
+FROM ubuntu:22.04 AS builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    libpq-dev \
+    libgrpc++-dev \
+    protobuf-compiler-grpc \
+    libprotobuf-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+
+# Copy source
+COPY . .
+
+# Build argument for target
+ARG BUILD_TARGET=chisinau_router
+
+# Build
+RUN mkdir build && cd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_GRPC=ON \
+          -DBUILD_REST=ON \
+          .. && \
+    make -j$(nproc) ${BUILD_TARGET}
+
+# Runtime image
+FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install -y \
+    libpq5 \
+    libgrpc++1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+ARG BUILD_TARGET=chisinau_router
+
+# Copy built binary
+COPY --from=builder /src/build/${BUILD_TARGET} /app/server
+
+# Set environment defaults
+ENV DB_HOST=localhost
+ENV DB_PORT=5432
+ENV DB_NAME=chisinau_routing
+ENV DB_USER=chisinau
+ENV DB_PASSWORD=routing_engine_2024
+
+EXPOSE 8080 50051
+
+CMD ["/app/server", "--host", "${DB_HOST}", "--password", "${DB_PASSWORD}"]
