@@ -106,36 +106,36 @@
         }
         .loc-btn.primary { background: #667eea; }
         
-        /* Algorithm visualization panel */
+        /* Algorithm visualization panel - ultra compact */
         .algo-panel {
-            position: fixed; top: 32px; left: 5px; right: 5px; z-index: 1001;
-            background: rgba(26,26,46,0.95); border-radius: 8px; padding: 6px;
-            display: none;
+            position: fixed; top: 32px; left: 4px; z-index: 1001;
+            background: rgba(26,26,46,0.92); border-radius: 6px; padding: 4px;
+            display: none; width: 140px;
         }
         .algo-panel.active { display: block; }
-        .algo-title { color: #fff; font-size: 10px; margin-bottom: 4px; font-weight: 600; }
-        .algo-modes { display: flex; gap: 2px; margin-bottom: 5px; }
+        .algo-modes { display: flex; gap: 1px; margin-bottom: 3px; }
         .algo-btn {
             flex: 1; background: rgba(255,255,255,0.1); border: none; color: #fff;
-            padding: 4px 2px; border-radius: 4px; font-size: 8px; cursor: pointer;
+            padding: 2px 1px; border-radius: 3px; font-size: 7px; cursor: pointer;
         }
         .algo-btn.active { background: #667eea; }
-        .algo-speed { margin: 5px 0; }
-        .algo-speed label { color: rgba(255,255,255,0.7); font-size: 8px; display: block; margin-bottom: 2px; }
-        .speed-slider { width: 100%; height: 4px; -webkit-appearance: none; background: rgba(255,255,255,0.2); border-radius: 2px; }
-        .speed-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: #667eea; border-radius: 50%; cursor: pointer; }
-        .algo-controls { display: flex; gap: 3px; margin-top: 5px; }
+        .algo-row { display: flex; gap: 2px; align-items: center; margin: 2px 0; }
+        .algo-row label { color: rgba(255,255,255,0.6); font-size: 6px; min-width: 28px; }
+        .algo-row input[type="range"] { flex: 1; height: 3px; }
+        .algo-row span { color: #4ecdc4; font-size: 7px; min-width: 24px; text-align: right; }
+        .algo-controls { display: flex; gap: 2px; margin-top: 3px; }
         .algo-ctrl-btn {
             flex: 1; background: rgba(255,255,255,0.1); border: none; color: #fff;
-            padding: 5px; border-radius: 4px; font-size: 9px; cursor: pointer;
+            padding: 3px 2px; border-radius: 3px; font-size: 8px; cursor: pointer;
         }
-        .algo-ctrl-btn.primary { background: #667eea; }
+        .algo-ctrl-btn.go { background: #2ecc71; }
         .algo-ctrl-btn.stop { background: #e74c3c; }
         .algo-status { 
-            margin-top: 5px; padding: 4px; background: rgba(0,0,0,0.2); border-radius: 4px;
-            font-size: 9px; color: rgba(255,255,255,0.8); max-height: 60px; overflow-y: auto;
+            margin-top: 3px; padding: 2px 3px; background: rgba(0,0,0,0.3); border-radius: 3px;
+            font-size: 7px; color: rgba(255,255,255,0.9); max-height: 36px; overflow-y: auto;
         }
-        .algo-step-info { color: #4ecdc4; font-weight: 600; }
+        .speed-slider { -webkit-appearance: none; background: rgba(255,255,255,0.2); border-radius: 2px; }
+        .speed-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 8px; height: 8px; background: #667eea; border-radius: 50%; cursor: pointer; }
         
         .maplibregl-popup-content {
             background: rgba(26,26,46,0.95) !important; color: #fff !important;
@@ -164,56 +164,32 @@
         <button class="ctrl-btn" id="zoomOut">−</button>
     </div>
     
-    <!-- Algorithm Visualization Panel -->
+    <!-- Algorithm Visualization Panel - Compact -->
     <div class="algo-panel" id="algoPanel">
-        <div class="algo-title">📊 Визуализация алгоритмов</div>
         <div class="algo-modes">
-            <button class="algo-btn active" data-algo="none">🚗 Обычный</button>
-            <button class="algo-btn" data-algo="kruskal">🌳 Kruskal</button>
-            <button class="algo-btn" data-algo="dijkstra">📍 Dijkstra</button>
+            <button class="algo-btn active" data-algo="none">Route</button>
+            <button class="algo-btn" data-algo="kruskal">MST</button>
+            <button class="algo-btn" data-algo="dijkstra">Path</button>
         </div>
-        
-        <!-- Point selection for algorithms -->
-        <div class="algo-points" id="algoPoints" style="display:none;">
-            <div class="input-row" style="margin-bottom:3px;">
-                <span class="input-icon">🟢</span>
-                <input type="text" class="route-input" id="algoStartInput" placeholder="Начальная точка (кликните карту)">
-            </div>
-            <div class="input-row">
-                <span class="input-icon">🔴</span>
-                <input type="text" class="route-input" id="algoEndInput" placeholder="Конечная точка (кликните карту)">
-            </div>
-            <div style="display:flex;gap:3px;margin-top:3px;">
-                <button class="algo-ctrl-btn" id="algoUseRouting" style="font-size:7px;">📋 Из маршрута</button>
-                <button class="algo-ctrl-btn" id="algoClearPoints" style="font-size:7px;">✕ Очистить</button>
-            </div>
+        <div class="algo-row">
+            <label>Edges</label>
+            <input type="range" class="speed-slider" id="maxEdgesSlider" min="50" max="2000" step="50" value="200">
+            <span id="maxEdgesVal">200</span>
         </div>
-        
-        <!-- Data source selector -->
-        <div class="algo-source" style="margin:5px 0;">
-            <label style="color:rgba(255,255,255,0.6);font-size:8px;">📦 Источник данных:</label>
-            <div style="display:flex;gap:2px;margin-top:2px;">
-                <button class="algo-btn active" data-source="db" id="sourceDb" style="font-size:8px;padding:2px 4px;">🗄️ БД (7810)</button>
-                <button class="algo-btn" data-source="builtin" id="sourceBuiltin" style="font-size:8px;padding:2px 4px;">📝 Базовый (35)</button>
-            </div>
-            <div style="margin-top:3px;">
-                <label style="color:rgba(255,255,255,0.5);font-size:7px;">Макс рёбер: <span id="maxEdgesVal">200</span></label>
-                <input type="range" class="speed-slider" id="maxEdgesSlider" min="50" max="1000" step="50" value="200" style="height:3px;">
-            </div>
+        <div class="algo-row">
+            <label>Speed</label>
+            <input type="range" class="speed-slider" id="speedSlider" min="1" max="500" step="1" value="10">
+            <span id="speedVal">10x</span>
         </div>
-        
-        <div class="algo-speed">
-            <label>⚡ Скорость: <span id="speedVal">1x</span></label>
-            <input type="range" class="speed-slider" id="speedSlider" min="0.25" max="4" step="0.25" value="1">
+        <div class="algo-row" style="font-size:6px;color:rgba(255,255,255,0.5);">
+            <span>Click map: 🟢Start 🔴End</span>
         </div>
         <div class="algo-controls">
-            <button class="algo-ctrl-btn primary" id="startAlgo">▶ Старт</button>
-            <button class="algo-ctrl-btn" id="stepAlgo">⏭ Шаг</button>
-            <button class="algo-ctrl-btn stop" id="stopAlgo">⏹ Стоп</button>
+            <button class="algo-ctrl-btn go" id="startAlgo">▶</button>
+            <button class="algo-ctrl-btn" id="stepAlgo">⏭</button>
+            <button class="algo-ctrl-btn stop" id="stopAlgo">⏹</button>
         </div>
-        <div class="algo-status" id="algoStatus">
-            Выберите алгоритм и нажмите Старт
-        </div>
+        <div class="algo-status" id="algoStatus">Select algorithm</div>
     </div>
     
     <div class="routing-panel" id="routingPanel">
@@ -611,7 +587,6 @@
         let edgeLayerIds = [];
         let algoStartPoint = null, algoEndPoint = null;
         let algoStartMarker = null, algoEndMarker = null;
-        let algoSource = 'db';
         let maxEdges = 200;
         
         // Algorithm panel toggle
@@ -632,25 +607,10 @@
                 btn.classList.add('active');
                 algoMode = btn.dataset.algo;
                 resetAlgo();
-                
-                // Show/hide point selection based on mode
-                const pointsDiv = document.getElementById('algoPoints');
-                pointsDiv.style.display = (algoMode === 'kruskal' || algoMode === 'dijkstra') ? 'block' : 'none';
-                
                 document.getElementById('algoStatus').innerHTML = 
-                    algoMode === 'none' ? 'Обычный режим - используйте маршрутизацию OSRM' :
-                    algoMode === 'kruskal' ? 'Kruskal MST - выберите точки и нажмите Старт' :
-                    'Dijkstra - выберите точки и нажмите Старт';
-            };
-        });
-        
-        // Data source selection
-        document.querySelectorAll('.algo-btn[data-source]').forEach(btn => {
-            btn.onclick = () => {
-                document.querySelectorAll('.algo-btn[data-source]').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                algoSource = btn.dataset.source;
-                loadGraph();
+                    algoMode === 'none' ? 'OSRM routing mode' :
+                    algoMode === 'kruskal' ? 'Kruskal MST - click map for points' :
+                    'Dijkstra - click map for points';
             };
         });
         
@@ -663,45 +623,27 @@
             loadGraph();
         };
         
-        // Speed slider
+        // Speed slider (1-500x)
         document.getElementById('speedSlider').oninput = function() {
-            algoSpeed = parseFloat(this.value);
+            algoSpeed = parseInt(this.value);
             document.getElementById('speedVal').textContent = algoSpeed + 'x';
-        };
-        
-        // Use points from routing panel
-        document.getElementById('algoUseRouting').onclick = () => {
-            if (startPoint) setAlgoPoint('start', startPoint.lat, startPoint.lng);
-            if (endPoint) setAlgoPoint('end', endPoint.lat, endPoint.lng);
-        };
-        
-        // Clear algo points
-        document.getElementById('algoClearPoints').onclick = () => {
-            algoStartPoint = algoEndPoint = null;
-            document.getElementById('algoStartInput').value = '';
-            document.getElementById('algoEndInput').value = '';
-            if (algoStartMarker) algoStartMarker.remove();
-            if (algoEndMarker) algoEndMarker.remove();
-            algoStartMarker = algoEndMarker = null;
         };
         
         // Set algorithm start/end point
         function setAlgoPoint(type, lat, lng) {
             const point = {lat, lng};
-            const input = document.getElementById(type === 'start' ? 'algoStartInput' : 'algoEndInput');
-            input.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
             
             if (type === 'start') {
                 algoStartPoint = point;
                 if (algoStartMarker) algoStartMarker.remove();
                 const el = document.createElement('div');
-                el.style.cssText = 'width:18px;height:18px;background:#2ecc71;border:3px solid #fff;border-radius:50%;box-shadow:0 0 8px #2ecc71;';
+                el.style.cssText = 'width:14px;height:14px;background:#2ecc71;border:2px solid #fff;border-radius:50%;box-shadow:0 0 6px #2ecc71;';
                 algoStartMarker = new maplibregl.Marker({element: el}).setLngLat([lng, lat]).addTo(map);
             } else {
                 algoEndPoint = point;
                 if (algoEndMarker) algoEndMarker.remove();
                 const el = document.createElement('div');
-                el.style.cssText = 'width:18px;height:18px;background:#e74c3c;border:3px solid #fff;border-radius:50%;box-shadow:0 0 8px #e74c3c;';
+                el.style.cssText = 'width:14px;height:14px;background:#e74c3c;border:2px solid #fff;border-radius:50%;box-shadow:0 0 6px #e74c3c;';
                 algoEndMarker = new maplibregl.Marker({element: el}).setLngLat([lng, lat]).addTo(map);
             }
         }
@@ -714,6 +656,12 @@
                     setAlgoPoint('start', e.lngLat.lat, e.lngLat.lng);
                 } else if (!algoEndPoint) {
                     setAlgoPoint('end', e.lngLat.lat, e.lngLat.lng);
+                } else {
+                    // Reset and set new start
+                    algoStartPoint = algoEndPoint = null;
+                    if (algoStartMarker) algoStartMarker.remove();
+                    if (algoEndMarker) algoEndMarker.remove();
+                    setAlgoPoint('start', e.lngLat.lat, e.lngLat.lng);
                 }
                 return;
             }
@@ -730,10 +678,9 @@
         
         // Load graph from server
         function loadGraph() {
-            const source = algoSource === 'builtin' ? 'builtin' : 'auto';
-            document.getElementById('algoStatus').innerHTML = 'Загрузка графа...';
+            document.getElementById('algoStatus').innerHTML = 'Loading...';
             
-            fetch(`/api/algorithms/graph?source=${source}&max_edges=${maxEdges}`)
+            fetch(`/api/algorithms/graph?max_edges=${maxEdges}`)
                 .then(r => r.json())
                 .then(data => {
                     if (data.success) {
@@ -741,7 +688,7 @@
                         graphEdges = data.edges;
                         drawGraph();
                         document.getElementById('algoStatus').innerHTML = 
-                            `✓ Загружено: ${data.total_nodes} вершин, ${data.total_edges} рёбер (${data.source})`;
+                            `${data.total_nodes} nodes, ${data.total_edges} edges`;
                     }
                 });
         }
@@ -824,27 +771,22 @@
         // Start algorithm
         document.getElementById('startAlgo').onclick = async function() {
             if (algoMode === 'none') {
-                document.getElementById('algoStatus').innerHTML = 'Выберите алгоритм Kruskal или Dijkstra';
+                document.getElementById('algoStatus').innerHTML = 'Select MST or Path';
                 return;
             }
             
-            // Don't reset - keep points
             algoSteps = [];
             algoCurrentStep = 0;
             algoRunning = false;
             if (algoInterval) clearTimeout(algoInterval);
             
             this.disabled = true;
-            document.getElementById('algoStatus').innerHTML = 'Загрузка шагов алгоритма...';
+            document.getElementById('algoStatus').innerHTML = 'Loading...';
             
             try {
                 let endpoint = algoMode === 'kruskal' ? '/api/algorithms/kruskal/steps' : '/api/algorithms/dijkstra/steps';
-                let body = {
-                    source: algoSource === 'builtin' ? 'builtin' : 'auto',
-                    max_edges: maxEdges
-                };
+                let body = { max_edges: maxEdges };
                 
-                // Use algo-specific points or fallback to routing points
                 const useStart = algoStartPoint || startPoint;
                 const useEnd = algoEndPoint || endPoint;
                 
@@ -861,46 +803,45 @@
                 const data = await resp.json();
                 
                 if (data.success) {
-                    // Update graph with returned data
                     graphNodes = data.nodes;
                     graphEdges = data.edges;
                     drawGraph();
                     
                     algoSteps = data.steps;
                     document.getElementById('algoStatus').innerHTML = 
-                        `✓ ${data.total_nodes} вершин, ${data.total_edges} рёбер<br>Загружено ${algoSteps.length} шагов. Запуск...`;
+                        `${algoSteps.length} steps ready`;
                     
-                    // Start animation
                     algoRunning = true;
                     runAlgoStep();
                 } else {
-                    document.getElementById('algoStatus').innerHTML = 'Ошибка: ' + data.error;
+                    document.getElementById('algoStatus').innerHTML = 'Error: ' + data.error;
                 }
             } catch (e) {
-                document.getElementById('algoStatus').innerHTML = 'Ошибка: ' + e.message;
+                document.getElementById('algoStatus').innerHTML = 'Error: ' + e.message;
             }
             
             this.disabled = false;
         };
         
-        // Run single algorithm step
+        // Run single algorithm step - optimized for speed
         function runAlgoStep() {
             if (algoCurrentStep >= algoSteps.length) {
                 algoRunning = false;
-                document.getElementById('algoStatus').innerHTML += '<br><b>✓ Завершено!</b>';
+                document.getElementById('algoStatus').innerHTML = `✓ Done! ${algoSteps.length} steps`;
                 return;
             }
             
             const step = algoSteps[algoCurrentStep];
             visualizeStep(step);
             
+            // Compact status
             document.getElementById('algoStatus').innerHTML = 
-                `<span class="algo-step-info">Шаг ${step.step}/${algoSteps.length}</span><br>${step.message}`;
+                `${algoCurrentStep+1}/${algoSteps.length} ${step.action}`;
             
             algoCurrentStep++;
             
             if (algoRunning) {
-                const delay = 1000 / algoSpeed;
+                const delay = Math.max(1, 1000 / algoSpeed);  // Min 1ms
                 algoInterval = setTimeout(runAlgoStep, delay);
             }
         }
@@ -914,18 +855,17 @@
             }
         }
         
-        // Visualize Kruskal step
+        // Visualize Kruskal step - brighter colors
         function visualizeKruskalStep(step) {
-            // Remove current edge highlight
             if (map.getLayer('algo-current-edge')) map.removeLayer('algo-current-edge');
             if (map.getSource('algo-current-edge')) map.removeSource('algo-current-edge');
             
-            // Draw current edge being considered
             if (step.edge) {
                 const coords = [[step.edge.from.lng, step.edge.from.lat], [step.edge.to.lng, step.edge.to.lat]];
-                let color = '#00bcd4';  // cyan for considering
-                if (step.action === 'accept') color = '#4caf50';  // green for accepted
-                if (step.action === 'reject') color = '#f44336';  // red for rejected
+                let color = '#00ffff';  // bright cyan for considering
+                let width = 8;
+                if (step.action === 'accept') { color = '#00ff00'; width = 10; }  // bright green
+                if (step.action === 'reject') { color = '#ff0000'; width = 6; }   // bright red
                 
                 map.addSource('algo-current-edge', {
                     type: 'geojson',
@@ -933,11 +873,11 @@
                 });
                 map.addLayer({
                     id: 'algo-current-edge', type: 'line', source: 'algo-current-edge',
-                    paint: { 'line-color': color, 'line-width': 6, 'line-opacity': 0.9 }
+                    paint: { 'line-color': color, 'line-width': width, 'line-opacity': 1 }
                 });
             }
             
-            // Draw MST edges (green)
+            // Draw MST edges
             if (map.getLayer('algo-mst')) map.removeLayer('algo-mst');
             if (map.getSource('algo-mst')) map.removeSource('algo-mst');
             
@@ -956,14 +896,14 @@
                 });
                 map.addLayer({
                     id: 'algo-mst', type: 'line', source: 'algo-mst',
-                    paint: { 'line-color': '#4caf50', 'line-width': 4, 'line-opacity': 0.8 }
+                    paint: { 'line-color': '#00ff00', 'line-width': 5, 'line-opacity': 0.9 }
                 });
             }
         }
         
-        // Visualize Dijkstra step
+        // Visualize Dijkstra step - brighter colors
         function visualizeDijkstraStep(step) {
-            // Update visited nodes (yellow markers)
+            // Update node colors
             nodeMarkers.forEach((marker, i) => {
                 const node = graphNodes[i];
                 const isVisited = step.visited && step.visited.some(v => v.id === node.id);
@@ -971,21 +911,24 @@
                 
                 const el = marker.getElement();
                 if (isCurrent) {
-                    el.style.background = '#ff5722';  // orange for current
-                    el.style.width = '16px';
-                    el.style.height = '16px';
-                } else if (isVisited) {
-                    el.style.background = '#ffc107';  // yellow for visited
+                    el.style.background = '#ff6600';  // bright orange
                     el.style.width = '14px';
                     el.style.height = '14px';
+                    el.style.boxShadow = '0 0 8px #ff6600';
+                } else if (isVisited) {
+                    el.style.background = '#ffff00';  // bright yellow
+                    el.style.width = '10px';
+                    el.style.height = '10px';
+                    el.style.boxShadow = 'none';
                 } else {
-                    el.style.background = '#fff';
-                    el.style.width = '12px';
-                    el.style.height = '12px';
+                    el.style.background = '#888';
+                    el.style.width = '6px';
+                    el.style.height = '6px';
+                    el.style.boxShadow = 'none';
                 }
             });
             
-            // Draw current edge being relaxed
+            // Current edge
             if (map.getLayer('algo-current-edge')) map.removeLayer('algo-current-edge');
             if (map.getSource('algo-current-edge')) map.removeSource('algo-current-edge');
             
@@ -997,11 +940,11 @@
                 });
                 map.addLayer({
                     id: 'algo-current-edge', type: 'line', source: 'algo-current-edge',
-                    paint: { 'line-color': '#00bcd4', 'line-width': 5, 'line-opacity': 0.9 }
+                    paint: { 'line-color': '#00ffff', 'line-width': 8, 'line-opacity': 1 }
                 });
             }
             
-            // Draw path so far
+            // Path so far
             if (map.getLayer('algo-path')) map.removeLayer('algo-path');
             if (map.getSource('algo-path')) map.removeSource('algo-path');
             
@@ -1012,12 +955,12 @@
                 });
                 map.addLayer({
                     id: 'algo-path', type: 'line', source: 'algo-path',
-                    paint: { 'line-color': step.action === 'found' ? '#4caf50' : '#667eea', 'line-width': 4, 'line-opacity': 0.8 }
+                    paint: { 'line-color': step.action === 'found' ? '#00ff00' : '#ff00ff', 'line-width': 6, 'line-opacity': 1 }
                 });
             }
         }
         
-        // Step button - single step
+        // Step button
         document.getElementById('stepAlgo').onclick = function() {
             if (algoSteps.length === 0) {
                 document.getElementById('startAlgo').click();
