@@ -172,6 +172,36 @@
             <button class="algo-btn" data-algo="kruskal">🌳 Kruskal</button>
             <button class="algo-btn" data-algo="dijkstra">📍 Dijkstra</button>
         </div>
+        
+        <!-- Point selection for algorithms -->
+        <div class="algo-points" id="algoPoints" style="display:none;">
+            <div class="input-row" style="margin-bottom:3px;">
+                <span class="input-icon">🟢</span>
+                <input type="text" class="route-input" id="algoStartInput" placeholder="Начальная точка (кликните карту)">
+            </div>
+            <div class="input-row">
+                <span class="input-icon">🔴</span>
+                <input type="text" class="route-input" id="algoEndInput" placeholder="Конечная точка (кликните карту)">
+            </div>
+            <div style="display:flex;gap:3px;margin-top:3px;">
+                <button class="algo-ctrl-btn" id="algoUseRouting" style="font-size:7px;">📋 Из маршрута</button>
+                <button class="algo-ctrl-btn" id="algoClearPoints" style="font-size:7px;">✕ Очистить</button>
+            </div>
+        </div>
+        
+        <!-- Data source selector -->
+        <div class="algo-source" style="margin:5px 0;">
+            <label style="color:rgba(255,255,255,0.6);font-size:8px;">📦 Источник данных:</label>
+            <div style="display:flex;gap:2px;margin-top:2px;">
+                <button class="algo-btn active" data-source="db" id="sourceDb" style="font-size:8px;padding:2px 4px;">🗄️ БД (7810)</button>
+                <button class="algo-btn" data-source="builtin" id="sourceBuiltin" style="font-size:8px;padding:2px 4px;">📝 Базовый (35)</button>
+            </div>
+            <div style="margin-top:3px;">
+                <label style="color:rgba(255,255,255,0.5);font-size:7px;">Макс рёбер: <span id="maxEdgesVal">200</span></label>
+                <input type="range" class="speed-slider" id="maxEdgesSlider" min="50" max="1000" step="50" value="200" style="height:3px;">
+            </div>
+        </div>
+        
         <div class="algo-speed">
             <label>⚡ Скорость: <span id="speedVal">1x</span></label>
             <input type="range" class="speed-slider" id="speedSlider" min="0.25" max="4" step="0.25" value="1">
@@ -364,16 +394,7 @@
             };
         });
         
-        // Map click for location
-        map.on('click', (e) => {
-            if (document.getElementById('routingPanel').classList.contains('active')) {
-                if (!startPoint) setPoint('start', e.lngLat.lat, e.lngLat.lng);
-                else if (!endPoint) setPoint('end', e.lngLat.lat, e.lngLat.lng);
-            } else {
-                selectedLoc = {lat: e.lngLat.lat, lng: e.lngLat.lng};
-                showLocInfo(selectedLoc);
-            }
-        });
+        // Map click for location - moved to algorithm section for unified handling
         
         function showLocInfo(loc) {
             if (tempMarker) tempMarker.remove();
@@ -588,6 +609,10 @@
         let graphEdges = [];
         let nodeMarkers = [];
         let edgeLayerIds = [];
+        let algoStartPoint = null, algoEndPoint = null;
+        let algoStartMarker = null, algoEndMarker = null;
+        let algoSource = 'db';
+        let maxEdges = 200;
         
         // Algorithm panel toggle
         document.getElementById('algoBtn').onclick = function() {
@@ -601,18 +626,42 @@
         };
         
         // Algorithm mode selection
-        document.querySelectorAll('.algo-btn').forEach(btn => {
+        document.querySelectorAll('.algo-btn[data-algo]').forEach(btn => {
             btn.onclick = () => {
-                document.querySelectorAll('.algo-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.algo-btn[data-algo]').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 algoMode = btn.dataset.algo;
                 resetAlgo();
+                
+                // Show/hide point selection based on mode
+                const pointsDiv = document.getElementById('algoPoints');
+                pointsDiv.style.display = (algoMode === 'kruskal' || algoMode === 'dijkstra') ? 'block' : 'none';
+                
                 document.getElementById('algoStatus').innerHTML = 
                     algoMode === 'none' ? 'Обычный режим - используйте маршрутизацию OSRM' :
-                    algoMode === 'kruskal' ? 'Kruskal MST - нажмите Старт для визуализации' :
-                    'Dijkstra - нажмите Старт для поиска пути';
+                    algoMode === 'kruskal' ? 'Kruskal MST - выберите точки и нажмите Старт' :
+                    'Dijkstra - выберите точки и нажмите Старт';
             };
         });
+        
+        // Data source selection
+        document.querySelectorAll('.algo-btn[data-source]').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('.algo-btn[data-source]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                algoSource = btn.dataset.source;
+                loadGraph();
+            };
+        });
+        
+        // Max edges slider
+        document.getElementById('maxEdgesSlider').oninput = function() {
+            maxEdges = parseInt(this.value);
+            document.getElementById('maxEdgesVal').textContent = maxEdges;
+        };
+        document.getElementById('maxEdgesSlider').onchange = function() {
+            loadGraph();
+        };
         
         // Speed slider
         document.getElementById('speedSlider').oninput = function() {
@@ -620,15 +669,79 @@
             document.getElementById('speedVal').textContent = algoSpeed + 'x';
         };
         
+        // Use points from routing panel
+        document.getElementById('algoUseRouting').onclick = () => {
+            if (startPoint) setAlgoPoint('start', startPoint.lat, startPoint.lng);
+            if (endPoint) setAlgoPoint('end', endPoint.lat, endPoint.lng);
+        };
+        
+        // Clear algo points
+        document.getElementById('algoClearPoints').onclick = () => {
+            algoStartPoint = algoEndPoint = null;
+            document.getElementById('algoStartInput').value = '';
+            document.getElementById('algoEndInput').value = '';
+            if (algoStartMarker) algoStartMarker.remove();
+            if (algoEndMarker) algoEndMarker.remove();
+            algoStartMarker = algoEndMarker = null;
+        };
+        
+        // Set algorithm start/end point
+        function setAlgoPoint(type, lat, lng) {
+            const point = {lat, lng};
+            const input = document.getElementById(type === 'start' ? 'algoStartInput' : 'algoEndInput');
+            input.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+            
+            if (type === 'start') {
+                algoStartPoint = point;
+                if (algoStartMarker) algoStartMarker.remove();
+                const el = document.createElement('div');
+                el.style.cssText = 'width:18px;height:18px;background:#2ecc71;border:3px solid #fff;border-radius:50%;box-shadow:0 0 8px #2ecc71;';
+                algoStartMarker = new maplibregl.Marker({element: el}).setLngLat([lng, lat]).addTo(map);
+            } else {
+                algoEndPoint = point;
+                if (algoEndMarker) algoEndMarker.remove();
+                const el = document.createElement('div');
+                el.style.cssText = 'width:18px;height:18px;background:#e74c3c;border:3px solid #fff;border-radius:50%;box-shadow:0 0 8px #e74c3c;';
+                algoEndMarker = new maplibregl.Marker({element: el}).setLngLat([lng, lat]).addTo(map);
+            }
+        }
+        
+        // Handle map clicks for algo points
+        map.on('click', (e) => {
+            const algoPanel = document.getElementById('algoPanel');
+            if (algoPanel.classList.contains('active') && (algoMode === 'kruskal' || algoMode === 'dijkstra')) {
+                if (!algoStartPoint) {
+                    setAlgoPoint('start', e.lngLat.lat, e.lngLat.lng);
+                } else if (!algoEndPoint) {
+                    setAlgoPoint('end', e.lngLat.lat, e.lngLat.lng);
+                }
+                return;
+            }
+            
+            // Original click handling
+            if (document.getElementById('routingPanel').classList.contains('active')) {
+                if (!startPoint) setPoint('start', e.lngLat.lat, e.lngLat.lng);
+                else if (!endPoint) setPoint('end', e.lngLat.lat, e.lngLat.lng);
+            } else {
+                selectedLoc = {lat: e.lngLat.lat, lng: e.lngLat.lng};
+                showLocInfo(selectedLoc);
+            }
+        });
+        
         // Load graph from server
         function loadGraph() {
-            fetch('/api/algorithms/graph')
+            const source = algoSource === 'builtin' ? 'builtin' : 'auto';
+            document.getElementById('algoStatus').innerHTML = 'Загрузка графа...';
+            
+            fetch(`/api/algorithms/graph?source=${source}&max_edges=${maxEdges}`)
                 .then(r => r.json())
                 .then(data => {
                     if (data.success) {
                         graphNodes = data.nodes;
                         graphEdges = data.edges;
                         drawGraph();
+                        document.getElementById('algoStatus').innerHTML = 
+                            `✓ Загружено: ${data.total_nodes} вершин, ${data.total_edges} рёбер (${data.source})`;
                     }
                 });
         }
@@ -715,16 +828,29 @@
                 return;
             }
             
-            resetAlgo();
+            // Don't reset - keep points
+            algoSteps = [];
+            algoCurrentStep = 0;
+            algoRunning = false;
+            if (algoInterval) clearTimeout(algoInterval);
+            
             this.disabled = true;
-            document.getElementById('algoStatus').innerHTML = 'Загрузка...';
+            document.getElementById('algoStatus').innerHTML = 'Загрузка шагов алгоритма...';
             
             try {
                 let endpoint = algoMode === 'kruskal' ? '/api/algorithms/kruskal/steps' : '/api/algorithms/dijkstra/steps';
-                let body = {};
+                let body = {
+                    source: algoSource === 'builtin' ? 'builtin' : 'auto',
+                    max_edges: maxEdges
+                };
                 
-                if (algoMode === 'dijkstra' && startPoint && endPoint) {
-                    body = { start: startPoint, end: endPoint };
+                // Use algo-specific points or fallback to routing points
+                const useStart = algoStartPoint || startPoint;
+                const useEnd = algoEndPoint || endPoint;
+                
+                if (useStart && useEnd) {
+                    body.start = useStart;
+                    body.end = useEnd;
                 }
                 
                 const resp = await fetch(endpoint, {
@@ -735,9 +861,14 @@
                 const data = await resp.json();
                 
                 if (data.success) {
+                    // Update graph with returned data
+                    graphNodes = data.nodes;
+                    graphEdges = data.edges;
+                    drawGraph();
+                    
                     algoSteps = data.steps;
                     document.getElementById('algoStatus').innerHTML = 
-                        `Загружено ${algoSteps.length} шагов. Запуск...`;
+                        `✓ ${data.total_nodes} вершин, ${data.total_edges} рёбер<br>Загружено ${algoSteps.length} шагов. Запуск...`;
                     
                     // Start animation
                     algoRunning = true;

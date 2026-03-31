@@ -782,12 +782,95 @@ def search_address():
 
 # ============== ALGORITHM VISUALIZATION API ==============
 
+# Cache for database graph (don't reload every request)
+_db_graph_cache = {}
+
+
+def load_graph_from_db(max_edges=500):
+    """Load graph from PostgreSQL database."""
+    global _db_graph_cache
+    
+    cache_key = f"db_{max_edges}"
+    if cache_key in _db_graph_cache:
+        return _db_graph_cache[cache_key]
+    
+    if not HAS_DB:
+        return None
+    
+    from algorithms import Graph
+    
+    try:
+        conn = psycopg2.connect(**settings.db.psycopg2_params)
+        cur = conn.cursor()
+        
+        # Get nodes with geometry
+        cur.execute("""
+            SELECT id, ST_Y(geom) as lat, ST_X(geom) as lng 
+            FROM nodes 
+            LIMIT 5000
+        """)
+        nodes_data = cur.fetchall()
+        
+        # Get edges with weights
+        cur.execute("""
+            SELECT source_node, target_node, length_m, COALESCE(name, highway_type, 'Road')
+            FROM edges
+            ORDER BY length_m ASC
+            LIMIT %s
+        """, (max_edges,))
+        edges_data = cur.fetchall()
+        
+        conn.close()
+        
+        if not nodes_data or not edges_data:
+            return None
+        
+        # Build graph
+        graph = Graph()
+        
+        # Add nodes
+        node_ids = set()
+        for edge in edges_data:
+            node_ids.add(edge[0])
+            node_ids.add(edge[1])
+        
+        for node_id, lat, lng in nodes_data:
+            if node_id in node_ids:
+                graph.add_node(node_id, lat, lng, f"Node {node_id}")
+        
+        # Add edges
+        for source, target, length, name in edges_data:
+            if source in graph.nodes and target in graph.nodes:
+                graph.add_edge(source, target, length, name or "Road", bidirectional=True)
+        
+        _db_graph_cache[cache_key] = graph
+        
+        return graph
+        
+    except Exception as e:
+        print(f"DB Graph load error: {e}")
+        return None
+
+
+def get_graph(use_db=True, max_edges=500):
+    """Get graph - try DB first, fall back to built-in."""
+    from algorithms import build_chisinau_graph
+    
+    if use_db:
+        db_graph = load_graph_from_db(max_edges)
+        if db_graph and len(db_graph.nodes) > 0:
+            return db_graph, "database"
+    
+    return build_chisinau_graph(), "builtin"
+
+
 @app.route('/api/algorithms/graph')
 def api_get_graph():
     """Get the Chișinău graph nodes and edges for visualization."""
-    from algorithms import build_chisinau_graph
+    use_db = request.args.get('source', 'auto') != 'builtin'
+    max_edges = min(int(request.args.get('max_edges', 500)), 2000)
     
-    graph = build_chisinau_graph()
+    graph, source = get_graph(use_db, max_edges)
     
     nodes = []
     for node_id, node in graph.nodes.items():
@@ -817,6 +900,7 @@ def api_get_graph():
     
     return jsonify({
         "success": True,
+        "source": source,
         "nodes": nodes,
         "edges": edges,
         "total_nodes": len(nodes),
@@ -827,10 +911,21 @@ def api_get_graph():
 @app.route('/api/algorithms/kruskal/steps', methods=['POST'])
 def api_kruskal_steps():
     """Get step-by-step visualization of Kruskal's algorithm."""
-    from algorithms import build_chisinau_graph, kruskal_mst_steps
+    from algorithms import kruskal_mst_steps
+    
+    data = request.get_json() or {}
+    use_db = data.get('source', 'auto') != 'builtin'
+    max_edges = min(data.get('max_edges', 200), 500)  # Limit for animation
     
     try:
-        graph = build_chisinau_graph()
+        graph, source = get_graph(use_db, max_edges)
+        
+        # If start/end points provided, filter to nearby subgraph
+        if 'start' in data and 'end' in data:
+            start_node = find_nearest_node(graph, data['start']['lat'], data['start']['lng'])
+            end_node = find_nearest_node(graph, data['end']['lat'], data['end']['lng'])
+            # For Kruskal we still use full graph but mark start/end
+        
         steps = kruskal_mst_steps(graph)
         
         # Get all graph data for visualization
@@ -842,6 +937,7 @@ def api_kruskal_steps():
         return jsonify({
             "success": True,
             "algorithm": "kruskal",
+            "source": source,
             "nodes": nodes,
             "edges": edges,
             "steps": steps,
@@ -854,21 +950,24 @@ def api_kruskal_steps():
 @app.route('/api/algorithms/dijkstra/steps', methods=['POST'])
 def api_dijkstra_steps():
     """Get step-by-step visualization of Dijkstra's algorithm."""
-    from algorithms import build_chisinau_graph, dijkstra_steps
+    from algorithms import dijkstra_steps
     
     data = request.get_json() or {}
+    use_db = data.get('source', 'auto') != 'builtin'
+    max_edges = min(data.get('max_edges', 300), 1000)
     
     try:
-        graph = build_chisinau_graph()
+        graph, source = get_graph(use_db, max_edges)
         
         # Get start and end nodes
         if 'start' in data and 'end' in data:
             start_node = find_nearest_node(graph, data['start']['lat'], data['start']['lng'])
             end_node = find_nearest_node(graph, data['end']['lat'], data['end']['lng'])
         else:
-            # Default: from center to Ciocana
-            start_node = 1  # Piața Marii Adunări Naționale
-            end_node = 30   # Ciocana
+            # Default: first and last node
+            node_ids = list(graph.nodes.keys())
+            start_node = node_ids[0] if node_ids else None
+            end_node = node_ids[-1] if len(node_ids) > 1 else node_ids[0] if node_ids else None
         
         if start_node is None or end_node is None:
             return jsonify({"success": False, "error": "Could not find nodes"}), 400
@@ -884,6 +983,7 @@ def api_dijkstra_steps():
         return jsonify({
             "success": True,
             "algorithm": "dijkstra",
+            "source": source,
             "nodes": nodes,
             "edges": edges,
             "steps": steps,
