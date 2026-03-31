@@ -94,6 +94,90 @@ class Graph:
 
 # ============== KRUSKAL'S ALGORITHM ==============
 
+def kruskal_mst_steps(graph: Graph) -> List[Dict]:
+    """
+    Kruskal's Algorithm with step-by-step visualization.
+    
+    Returns a list of steps, each step contains:
+    - step: step number
+    - action: 'consider' or 'accept' or 'reject'
+    - edge: the edge being processed
+    - mst_edges: current MST edges so far
+    - message: description of what happened
+    """
+    if not graph.nodes:
+        return []
+    
+    # Create node index mapping
+    node_ids = list(graph.nodes.keys())
+    node_to_idx = {nid: idx for idx, nid in enumerate(node_ids)}
+    n = len(node_ids)
+    
+    # Sort edges by weight (ascending)
+    sorted_edges = sorted(graph.edges, key=lambda e: e.weight)
+    
+    # Initialize Union-Find
+    uf = UnionFind(n)
+    
+    steps = []
+    mst_edges: List[Edge] = []
+    step_num = 0
+    
+    for edge in sorted_edges:
+        u_idx = node_to_idx.get(edge.u)
+        v_idx = node_to_idx.get(edge.v)
+        
+        if u_idx is None or v_idx is None:
+            continue
+        
+        step_num += 1
+        edge_info = {
+            "from": {"id": edge.u, "lat": graph.nodes[edge.u].lat, "lng": graph.nodes[edge.u].lng, "name": graph.nodes[edge.u].name},
+            "to": {"id": edge.v, "lat": graph.nodes[edge.v].lat, "lng": graph.nodes[edge.v].lng, "name": graph.nodes[edge.v].name},
+            "weight": edge.weight,
+            "name": edge.name
+        }
+        
+        # Step: considering this edge
+        steps.append({
+            "step": step_num,
+            "action": "consider",
+            "edge": edge_info,
+            "mst_edges": [{"from": {"lat": graph.nodes[e.u].lat, "lng": graph.nodes[e.u].lng},
+                          "to": {"lat": graph.nodes[e.v].lat, "lng": graph.nodes[e.v].lng},
+                          "weight": e.weight} for e in mst_edges],
+            "message": f"Рассматриваем ребро {graph.nodes[edge.u].name} ↔ {graph.nodes[edge.v].name} ({edge.weight:.0f}м)"
+        })
+        
+        # Check if adding this edge creates a cycle
+        if uf.union(u_idx, v_idx):
+            mst_edges.append(edge)
+            steps.append({
+                "step": step_num,
+                "action": "accept",
+                "edge": edge_info,
+                "mst_edges": [{"from": {"lat": graph.nodes[e.u].lat, "lng": graph.nodes[e.u].lng},
+                              "to": {"lat": graph.nodes[e.v].lat, "lng": graph.nodes[e.v].lng},
+                              "weight": e.weight} for e in mst_edges],
+                "message": f"✓ Добавляем ребро (не создаёт цикл)"
+            })
+            
+            if len(mst_edges) == n - 1:
+                break
+        else:
+            steps.append({
+                "step": step_num,
+                "action": "reject",
+                "edge": edge_info,
+                "mst_edges": [{"from": {"lat": graph.nodes[e.u].lat, "lng": graph.nodes[e.u].lng},
+                              "to": {"lat": graph.nodes[e.v].lat, "lng": graph.nodes[e.v].lng},
+                              "weight": e.weight} for e in mst_edges],
+                "message": f"✗ Отклоняем ребро (создаёт цикл)"
+            })
+    
+    return steps
+
+
 def kruskal_mst(graph: Graph) -> Tuple[List[Edge], float]:
     """
     Kruskal's Algorithm - Minimum Spanning Tree
@@ -175,6 +259,139 @@ def kruskal_mst_path(graph: Graph, node_ids: List[int]) -> Tuple[List[Edge], flo
 
 
 # ============== DIJKSTRA'S ALGORITHM ==============
+
+def dijkstra_steps(
+    graph: Graph, 
+    start: int, 
+    end: int
+) -> List[Dict]:
+    """
+    Dijkstra's Algorithm with step-by-step visualization.
+    
+    Returns a list of steps, each step contains:
+    - step: step number
+    - action: 'visit', 'relax', 'found', 'skip'
+    - current_node: the node being processed
+    - edge: the edge being relaxed (if applicable)
+    - visited: list of visited node IDs
+    - distances: current shortest distances
+    - message: description of what happened
+    """
+    if start not in graph.adj or end not in graph.adj:
+        return []
+    
+    dist: Dict[int, float] = {start: 0}
+    prev: Dict[int, Optional[int]] = {start: None}
+    pq = [(0.0, start)]
+    visited: Set[int] = set()
+    steps = []
+    step_num = 0
+    
+    # Initial step
+    step_num += 1
+    steps.append({
+        "step": step_num,
+        "action": "start",
+        "current_node": {
+            "id": start,
+            "lat": graph.nodes[start].lat,
+            "lng": graph.nodes[start].lng,
+            "name": graph.nodes[start].name
+        },
+        "visited": [],
+        "distances": {str(start): 0},
+        "path_so_far": [],
+        "message": f"Начинаем с вершины {graph.nodes[start].name}"
+    })
+    
+    while pq:
+        d, u = heapq.heappop(pq)
+        
+        if u in visited:
+            continue
+        
+        visited.add(u)
+        step_num += 1
+        
+        # Build path to current node
+        path_coords = []
+        curr = u
+        while curr is not None:
+            node = graph.nodes[curr]
+            path_coords.insert(0, [node.lng, node.lat])
+            curr = prev.get(curr)
+        
+        steps.append({
+            "step": step_num,
+            "action": "visit",
+            "current_node": {
+                "id": u,
+                "lat": graph.nodes[u].lat,
+                "lng": graph.nodes[u].lng,
+                "name": graph.nodes[u].name
+            },
+            "visited": [{"id": v, "lat": graph.nodes[v].lat, "lng": graph.nodes[v].lng, "name": graph.nodes[v].name} for v in visited],
+            "distances": {str(k): v for k, v in dist.items()},
+            "path_so_far": path_coords,
+            "message": f"Посещаем {graph.nodes[u].name} (расстояние: {d:.0f}м)"
+        })
+        
+        if u == end:
+            step_num += 1
+            steps.append({
+                "step": step_num,
+                "action": "found",
+                "current_node": {
+                    "id": u,
+                    "lat": graph.nodes[u].lat,
+                    "lng": graph.nodes[u].lng,
+                    "name": graph.nodes[u].name
+                },
+                "visited": [{"id": v, "lat": graph.nodes[v].lat, "lng": graph.nodes[v].lng, "name": graph.nodes[v].name} for v in visited],
+                "distances": {str(k): v for k, v in dist.items()},
+                "path_so_far": path_coords,
+                "total_distance": dist[end],
+                "message": f"✓ Найден путь до {graph.nodes[end].name}! Расстояние: {dist[end]:.0f}м"
+            })
+            break
+        
+        for v, weight, street in graph.adj.get(u, []):
+            if v in visited:
+                continue
+            
+            new_dist = d + weight
+            old_dist = dist.get(v, float('inf'))
+            
+            if new_dist < old_dist:
+                dist[v] = new_dist
+                prev[v] = u
+                heapq.heappush(pq, (new_dist, v))
+                
+                step_num += 1
+                steps.append({
+                    "step": step_num,
+                    "action": "relax",
+                    "current_node": {
+                        "id": u,
+                        "lat": graph.nodes[u].lat,
+                        "lng": graph.nodes[u].lng,
+                        "name": graph.nodes[u].name
+                    },
+                    "edge": {
+                        "from": {"id": u, "lat": graph.nodes[u].lat, "lng": graph.nodes[u].lng, "name": graph.nodes[u].name},
+                        "to": {"id": v, "lat": graph.nodes[v].lat, "lng": graph.nodes[v].lng, "name": graph.nodes[v].name},
+                        "weight": weight,
+                        "street": street
+                    },
+                    "visited": [{"id": vv, "lat": graph.nodes[vv].lat, "lng": graph.nodes[vv].lng, "name": graph.nodes[vv].name} for vv in visited],
+                    "distances": {str(k): vv for k, vv in dist.items()},
+                    "old_distance": old_dist if old_dist != float('inf') else None,
+                    "new_distance": new_dist,
+                    "message": f"Обновляем расстояние до {graph.nodes[v].name}: {new_dist:.0f}м" + (f" (было {old_dist:.0f}м)" if old_dist != float('inf') else "")
+                })
+    
+    return steps
+
 
 def dijkstra_shortest_path(
     graph: Graph, 

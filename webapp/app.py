@@ -780,6 +780,121 @@ def search_address():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+# ============== ALGORITHM VISUALIZATION API ==============
+
+@app.route('/api/algorithms/graph')
+def api_get_graph():
+    """Get the Chișinău graph nodes and edges for visualization."""
+    from algorithms import build_chisinau_graph
+    
+    graph = build_chisinau_graph()
+    
+    nodes = []
+    for node_id, node in graph.nodes.items():
+        nodes.append({
+            "id": node_id,
+            "lat": node.lat,
+            "lng": node.lng,
+            "name": node.name
+        })
+    
+    edges = []
+    for edge in graph.edges:
+        edges.append({
+            "from": {
+                "id": edge.u,
+                "lat": graph.nodes[edge.u].lat,
+                "lng": graph.nodes[edge.u].lng
+            },
+            "to": {
+                "id": edge.v,
+                "lat": graph.nodes[edge.v].lat,
+                "lng": graph.nodes[edge.v].lng
+            },
+            "weight": edge.weight,
+            "name": edge.name
+        })
+    
+    return jsonify({
+        "success": True,
+        "nodes": nodes,
+        "edges": edges,
+        "total_nodes": len(nodes),
+        "total_edges": len(edges)
+    })
+
+
+@app.route('/api/algorithms/kruskal/steps', methods=['POST'])
+def api_kruskal_steps():
+    """Get step-by-step visualization of Kruskal's algorithm."""
+    from algorithms import build_chisinau_graph, kruskal_mst_steps
+    
+    try:
+        graph = build_chisinau_graph()
+        steps = kruskal_mst_steps(graph)
+        
+        # Get all graph data for visualization
+        nodes = [{"id": n.id, "lat": n.lat, "lng": n.lng, "name": n.name} for n in graph.nodes.values()]
+        edges = [{"from": {"lat": graph.nodes[e.u].lat, "lng": graph.nodes[e.u].lng},
+                  "to": {"lat": graph.nodes[e.v].lat, "lng": graph.nodes[e.v].lng},
+                  "weight": e.weight, "name": e.name} for e in graph.edges]
+        
+        return jsonify({
+            "success": True,
+            "algorithm": "kruskal",
+            "nodes": nodes,
+            "edges": edges,
+            "steps": steps,
+            "total_steps": len(steps)
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/algorithms/dijkstra/steps', methods=['POST'])
+def api_dijkstra_steps():
+    """Get step-by-step visualization of Dijkstra's algorithm."""
+    from algorithms import build_chisinau_graph, dijkstra_steps
+    
+    data = request.get_json() or {}
+    
+    try:
+        graph = build_chisinau_graph()
+        
+        # Get start and end nodes
+        if 'start' in data and 'end' in data:
+            start_node = find_nearest_node(graph, data['start']['lat'], data['start']['lng'])
+            end_node = find_nearest_node(graph, data['end']['lat'], data['end']['lng'])
+        else:
+            # Default: from center to Ciocana
+            start_node = 1  # Piața Marii Adunări Naționale
+            end_node = 30   # Ciocana
+        
+        if start_node is None or end_node is None:
+            return jsonify({"success": False, "error": "Could not find nodes"}), 400
+        
+        steps = dijkstra_steps(graph, start_node, end_node)
+        
+        # Get all graph data for visualization
+        nodes = [{"id": n.id, "lat": n.lat, "lng": n.lng, "name": n.name} for n in graph.nodes.values()]
+        edges = [{"from": {"lat": graph.nodes[e.u].lat, "lng": graph.nodes[e.u].lng},
+                  "to": {"lat": graph.nodes[e.v].lat, "lng": graph.nodes[e.v].lng},
+                  "weight": e.weight, "name": e.name} for e in graph.edges]
+        
+        return jsonify({
+            "success": True,
+            "algorithm": "dijkstra",
+            "nodes": nodes,
+            "edges": edges,
+            "steps": steps,
+            "total_steps": len(steps),
+            "start_node": {"id": start_node, "name": graph.nodes[start_node].name},
+            "end_node": {"id": end_node, "name": graph.nodes[end_node].name}
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 # ============== WEBSOCKET ==============
 
 @socketio.on('connect')
